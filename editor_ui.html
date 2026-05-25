@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>KadEdit</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ---- MENU BAR ---- */
+  #menubar {
+    background: #181825;
+    border-bottom: 1px solid #313244;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    height: 32px;
+    flex-shrink: 0;
+    gap: 2px;
+  }
+
+  .menu-item {
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #cdd6f4;
+    position: relative;
+  }
+  .menu-item:hover { background: #313244; }
+  .menu-item.active { background: #313244; }
+
+  /* dropdown menus */
+  .dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #1e1e2e;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    min-width: 200px;
+    z-index: 1000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    padding: 4px 0;
+  }
+  .menu-item.active .dropdown { display: block; }
+
+  .dropdown-item {
+    padding: 7px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #cdd6f4;
+    gap: 20px;
+  }
+  .dropdown-item:hover { background: #313244; }
+  .dropdown-item .shortcut { color: #6c7086; font-size: 11px; }
+  .dropdown-divider { height: 1px; background: #313244; margin: 4px 0; }
+  .dropdown-item.disabled { color: #45475a; cursor: default; }
+  .dropdown-item.disabled:hover { background: none; }
+
+  /* title bar info */
+  #title-info {
+    margin-left: auto;
+    font-size: 12px;
+    color: #6c7086;
+  }
+
+  /* ---- TOOLBAR ---- */
+  #toolbar {
+    background: #181825;
+    border-bottom: 1px solid #313244;
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    gap: 2px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .tb-btn {
+    padding: 4px 10px;
+    background: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    color: #cdd6f4;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tb-btn:hover { background: #45475a; }
+  .tb-btn.active { background: #7f77dd; border-color: #7f77dd; color: white; }
+
+  .tb-sep { width: 1px; height: 20px; background: #45475a; margin: 0 4px; }
+
+  .tb-select {
+    background: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    color: #cdd6f4;
+    font-size: 12px;
+    padding: 3px 6px;
+    cursor: pointer;
+  }
+  .tb-select:focus { outline: none; border-color: #7f77dd; }
+
+  /* ---- EDITOR AREA ---- */
+  #editor-wrap {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* line numbers */
+  #line-numbers {
+    background: #181825;
+    color: #45475a;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px 8px;
+    text-align: right;
+    min-width: 48px;
+    border-right: 1px solid #313244;
+    overflow: hidden;
+    flex-shrink: 0;
+    white-space: pre;
+    pointer-events: none;
+  }
+
+  /* the actual text area */
+  #editor {
+    flex: 1;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px;
+    border: none;
+    outline: none;
+    resize: none;
+    overflow-y: scroll;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    tab-size: 4;
+    scrollbar-width: thin;
+    scrollbar-color: #45475a #181825;
+  }
+
+  #editor::-webkit-scrollbar { width: 10px; }
+  #editor::-webkit-scrollbar-track { background: #181825; }
+  #editor::-webkit-scrollbar-thumb { background: #45475a; border-radius: 4px; }
+  #editor::-webkit-scrollbar-thumb:hover { background: #585b70; }
+
+  /* ---- STATUS BAR ---- */
+  #statusbar {
+    background: #7f77dd;
+    color: white;
+        --modified-color: #f38ba8;
+
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    height: 24px;
+    font-size: 12px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  #statusbar .status-right {
+    margin-left: auto;
+    display: flex;
+    gap: 16px;
+  }
+
+  /* ---- FIND & REPLACE DIALOG ---- */
+  #find-dialog {
+    display: none;
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: #1e1e2e;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 16px;
+    z-index: 2000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    min-width: 320px;
+  }
+  #find-dialog.show { display: block; }
+
+  .dialog-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #cdd6f4;
+  }
+
+  .dialog-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .dialog-row label {
+    font-size: 12px;
+    color: #6c7086;
+    min-width: 60px;
+  }
+
+  .dialog-input {
+    flex: 1;
+    background: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    color: #cdd6f4;
+    font-size: 13px;
+    padding: 5px 8px;
+    outline: none;
+  }
+  .dialog-input:focus { border-color: #7f77dd; }
+
+  .dialog-btns {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .dialog-btn {
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #45475a;
+    background: #313244;
+    color: #cdd6f4;
+  }
+  .dialog-btn:hover { background: #45475a; }
+  .dialog-btn.primary { background: #7f77dd; border-color: #7f77dd; color: white; }
+  .dialog-btn.primary:hover { background: #9b94e8; }
+  .dialog-btn.close-btn { margin-left: auto; }
+
+  #find-result {
+    font-size: 11px;
+    color: #a6e3a1;
+    margin-top: 6px;
+    min-height: 16px;
+  }
+
+  /* ---- FONT/COLOR DIALOG ---- */
+  #format-dialog {
+    display: none;
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: #1e1e2e;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 16px;
+    z-index: 2000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    min-width: 280px;
+  }
+  #format-dialog.show { display: block; }
+
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .color-swatch:hover { border-color: white; }
+  .color-swatch.selected { border-color: white; }
+
+  /* ---- RECENT FILES DIALOG ---- */
+  #recent-dialog {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1e1e2e;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 16px;
+    z-index: 2000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    min-width: 360px;
+  }
+  #recent-dialog.show { display: block; }
+
+  .recent-item {
+    padding: 8px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #cdd6f4;
+  }
+  .recent-item:hover { background: #313244; }
+  .recent-empty { color: #6c7086; font-size: 13px; padding: 8px; }
+
+  /* overlay to close dropdowns */
+  #overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 500;
+  }
+  #overlay.show { display: block; }
+
+  /* word count badge */
+  #wordcount { color: rgba(255,255,255,0.8); }
+</style>
+</head>
+<body>
+
+<!-- OVERLAY to close menus -->
+<div id="overlay" onclick="closeAll()"></div>
+
+<!-- MENU BAR -->
+<div id="menubar">
+  <!-- File menu -->
+  <div class="menu-item" id="menu-file" onclick="toggleMenu('file')">
+    File
+    <div class="dropdown" id="dd-file">
+      <div class="dropdown-item" onclick="newFile()">New <span class="shortcut">Ctrl+M</span></div>
+      <div class="dropdown-item" onclick="openFile()">Open... <span class="shortcut">Ctrl+O</span></div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item" onclick="saveFile()">Save <span class="shortcut">Ctrl+S</span></div>
+      <div class="dropdown-item" onclick="saveAs()">Save As... <span class="shortcut">Ctrl+Shift+S</span></div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item" onclick="showRecent()">Recent Files</div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item" onclick="closeFile()">Close <span class="shortcut">Ctrl+W</span></div>
+    </div>
+  </div>
+
+  <!-- Edit menu -->
+  <div class="menu-item" id="menu-edit" onclick="toggleMenu('edit')">
+    Edit
+    <div class="dropdown" id="dd-edit">
+      <div class="dropdown-item" onclick="doUndo()">Undo <span class="shortcut">Ctrl+Z</span></div>
+      <div class="dropdown-item" onclick="doRedo()">Redo <span class="shortcut">Ctrl+Y</span></div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item" onclick="selectAll()">Select All <span class="shortcut">Ctrl+A</span></div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item" onclick="showFind()">Find & Replace <span class="shortcut">Ctrl+F</span></div>
+    </div>
+  </div>
+
+  <!-- Format menu -->
+  <div class="menu-item" id="menu-format" onclick="toggleMenu('format')">
+    Format
+    <div class="dropdown" id="dd-format">
+      <div class="dropdown-item" onclick="showFormat()">Font & Color...</div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item" onclick="toggleWrap()">Word Wrap <span id="wrap-check" class="shortcut">OFF</span></div>
+    </div>
+  </div>
+
+  <!-- View menu -->
+  <div class="menu-item" id="menu-view" onclick="toggleMenu('view')">
+    View
+    <div class="dropdown" id="dd-view">
+      <div class="dropdown-item" onclick="toggleLineNums()">Line Numbers <span id="linenum-check" class="shortcut">ON</span></div>
+      <div class="dropdown-item" onclick="zoomIn()">Zoom In <span class="shortcut">Ctrl++</span></div>
+      <div class="dropdown-item" onclick="zoomOut()">Zoom Out <span class="shortcut">Ctrl+-</span></div>
+      <div class="dropdown-item" onclick="zoomReset()">Reset Zoom <span class="shortcut">Ctrl+0</span></div>
+    </div>
+  </div>
+<div id="title-info">NotePad@dijays</div>
+</div>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <button class="tb-btn" onclick="newFile()" title="New (Ctrl+M)">📄 New</button>
+  <button class="tb-btn" onclick="openFile()" title="Open (Ctrl+O)">📂 Open</button>
+  <button class="tb-btn" onclick="saveFile()" title="Save (Ctrl+S)">💾 Save</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="doUndo()" title="Undo (Ctrl+Z)">↩ Undo</button>
+  <button class="tb-btn" onclick="doRedo()" title="Redo (Ctrl+Y)">↪ Redo</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="showFind()" title="Find & Replace (Ctrl+F)">🔍 Find</button>
+  <button class="tb-btn" onclick="selectAll()" title="Select All (Ctrl+A)">☰ Select All</button>
+  <div class="tb-sep"></div>
+
+  <!-- Font selector -->
+  <select class="tb-select" id="font-select" onchange="changeFont(this.value)" title="Font">
+    <option>Consolas</option>
+    <option>Arial</option>
+    <option>Courier New</option>
+    <option>Times New Roman</option>
+    <option>Verdana</option>
+    <option>Georgia</option>
+  </select>
+
+  <!-- Size selector -->
+  <select class="tb-select" id="size-select" onchange="changeSize(this.value)" title="Font Size">
+    <option>10</option>
+    <option>12</option>
+    <option selected>14</option>
+    <option>16</option>
+    <option>18</option>
+    <option>20</option>
+    <option>24</option>
+  </select>
+
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="wrap-btn" onclick="toggleWrap()" title="Toggle Word Wrap">↵ Wrap</button>
+</div>
+
+<!-- EDITOR AREA -->
+<div id="editor-wrap">
+  <div id="line-numbers">1</div>
+  <textarea id="editor"
+    spellcheck="false"
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="off"
+    placeholder="Start typing here..."></textarea>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <span id="status-file">📄 untitled.txt</span>
+<span id="status-modified"></span>
+  <div class="status-right">
+    <span id="wordcount">Words: 0</span>
+    <span id="status-pos">Ln 1, Col 1</span>
+    <span id="status-encoding">UTF-8</span>
+    <span id="status-wrap">Wrap: OFF</span>
+  </div>
+</div>
+
+<!-- FIND & REPLACE DIALOG -->
+<div id="find-dialog">
+  <div class="dialog-title">🔍 Find & Replace</div>
+  <div class="dialog-row">
+    <label>Find</label>
+    <input class="dialog-input" id="find-input" placeholder="Search text..." />
+  </div>
+  <div class="dialog-row">
+    <label>Replace</label>
+    <input class="dialog-input" id="replace-input" placeholder="Replace with..." />
+  </div>
+  <div id="find-result"></div>
+  <div class="dialog-btns">
+    <button class="dialog-btn primary" onclick="doFind()">Find Next</button>
+    <button class="dialog-btn" onclick="doReplace()">Replace</button>
+    <button class="dialog-btn" onclick="doReplaceAll()">Replace All</button>
+    <button class="dialog-btn close-btn" onclick="closeFind()">✕</button>
+  </div>
+</div>
+
+<!-- FORMAT DIALOG -->
+<div id="format-dialog">
+  <div class="dialog-title">🎨 Font & Color</div>
+
+  <div style="margin-bottom:10px">
+    <div style="font-size:12px;color:#6c7086;margin-bottom:6px">Text Color</div>
+    <div class="color-grid">
+      <div class="color-swatch selected" style="background:#cdd6f4" onclick="setColor('#cdd6f4',this)" title="White"></div>
+      <div class="color-swatch" style="background:#f38ba8" onclick="setColor('#f38ba8',this)" title="Red"></div>
+      <div class="color-swatch" style="background:#a6e3a1" onclick="setColor('#a6e3a1',this)" title="Green"></div>
+      <div class="color-swatch" style="background:#f9e2af" onclick="setColor('#f9e2af',this)" title="Yellow"></div>
+      <div class="color-swatch" style="background:#89dceb" onclick="setColor('#89dceb',this)" title="Cyan"></div>
+      <div class="color-swatch" style="background:#cba6f7" onclick="setColor('#cba6f7',this)" title="Purple"></div>
+      <div class="color-swatch" style="background:#fab387" onclick="setColor('#fab387',this)" title="Orange"></div>
+      <div class="color-swatch" style="background:#74c7ec" onclick="setColor('#74c7ec',this)" title="Blue"></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:10px">
+    <div style="font-size:12px;color:#6c7086;margin-bottom:6px">Background</div>
+    <div class="color-grid">
+      <div class="color-swatch selected" style="background:#1e1e2e;border:1px solid #45475a" onclick="setBg('#1e1e2e',this)" title="Dark"></div>
+      <div class="color-swatch" style="background:#ffffff;border:1px solid #45475a" onclick="setBg('#ffffff',this)" title="White"></div>
+      <div class="color-swatch" style="background:#1a1a2e" onclick="setBg('#1a1a2e',this)" title="Navy"></div>
+      <div class="color-swatch" style="background:#0f2027" onclick="setBg('#0f2027',this)" title="Ocean"></div>
+      <div class="color-swatch" style="background:#2d1b33" onclick="setBg('#2d1b33',this)" title="Purple"></div>
+      <div class="color-swatch" style="background:#1b2838" onclick="setBg('#1b2838',this)" title="Steam"></div>
+    </div>
+  </div>
+
+  <button class="dialog-btn close-btn" onclick="closeFormat()" style="width:100%;margin-top:8px">Close</button>
+</div>
+
+<!-- RECENT FILES DIALOG -->
+<div id="recent-dialog">
+  <div class="dialog-title">📋 Recent Files</div>
+  <div id="recent-list"></div>
+  <button class="dialog-btn close-btn" onclick="closeRecent()" style="width:100%;margin-top:12px">Close</button>
+</div>
+
+<script>
+// ---- editor state ----
+let currentFile  = 'untitled.txt';
+let isModified   = false;
+let insertMode   = true;
+let wordWrap     = false;
+let showLineNums = true;
+let fontSize     = 14;
+let recentFiles  = []; // simple array, no localStorage needed
+let findIndex    = -1; // for find next
+
+const editor    = document.getElementById('editor');
+const lineNums  = document.getElementById('line-numbers');
+
+// ---- undo is built into textarea natively ----
+// but we track for status bar
+function doUndo() { document.execCommand('undo'); updateStatus(); }
+function doRedo()  { document.execCommand('redo'); updateStatus(); }
+
+// ---- update line numbers ----
+function updateLineNumbers() {
+  if (!showLineNums) { lineNums.style.display = 'none'; return; }
+  lineNums.style.display = 'block';
+  const lines = editor.value.split('\n').length;
+  let nums = '';
+  for (let i = 1; i <= lines; i++) nums += i + '\n';
+  lineNums.textContent = nums;
+  // sync scroll
+  lineNums.scrollTop = editor.scrollTop;
+}
+
+// ---- update status bar ----
+function updateStatus() {
+  const text    = editor.value;
+  const lines   = text.split('\n');
+  const pos     = editor.selectionStart;
+  let row = 0, col = 0;
+  let count = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (count + lines[i].length + 1 > pos) { row = i; col = pos - count; break; }
+    count += lines[i].length + 1;
+  }
+
+  // word count
+  const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+  document.getElementById('status-pos').textContent     = `Ln ${row+1}, Col ${col+1}`;
+  document.getElementById('wordcount').textContent      = `Words: ${words}`;
+  document.getElementById('status-modified').innerHTML = isModified ? '<span style="color:#f38ba8 !important;font-size:15px;font-weight:bold;">⬤ Modified</span>' : '';
+  // insert mode display removed - confusing for users
+  document.getElementById('status-wrap').textContent    = `Wrap: ${wordWrap ? 'ON' : 'OFF'}`;
+  document.getElementById('status-file').textContent    = `📄 ${currentFile}`;
+document.getElementById('title-info').innerHTML =
+`${isModified ? '<span style="color:#ff4d6d;font-weight:bold;font-size:18px;">⬤</span> ' : ''}${currentFile} | NotePad@dijays`;}
+
+// ---- FILE OPERATIONS (Part A) ----
+
+function newFile() {
+  closeAll();
+  if (isModified) {
+    if (!confirm('Unsaved changes! Create new file anyway?')) return;
+  }
+  editor.value  = '';
+  currentFile   = 'untitled.txt';
+  isModified    = false;
+  updateLineNumbers();
+  updateStatus();
+}
+
+function openFile() {
+  closeAll();
+  // use file input to open
+  const input = document.createElement('input');
+  input.type  = 'file';
+  input.accept= '.txt,.cpp,.h,.py,.js,.html,.css,.md,*';
+  input.onchange = e => {
+    const file   = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      editor.value = ev.target.result;
+      currentFile  = file.name;
+      isModified   = false;
+      addRecent(file.name);
+      updateLineNumbers();
+      updateStatus();
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function saveFile() {
+  closeAll();
+  // create a download
+  const blob = new Blob([editor.value], {type: 'text/plain'});
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = currentFile;
+  a.click();
+  isModified = false;
+  addRecent(currentFile);
+  updateStatus();
+}
+
+function saveAs() {
+  closeAll();
+  const name = prompt('Save as:', currentFile);
+  if (!name) return;
+  currentFile = name;
+  saveFile();
+}
+
+function closeFile() {
+  closeAll();
+  if (isModified) {
+    if (!confirm('Unsaved changes! Close anyway?')) return;
+  }
+  editor.value = '';
+  currentFile  = 'untitled.txt';
+  isModified   = false;
+  updateLineNumbers();
+  updateStatus();
+}
+
+// ---- RECENT FILES ----
+function addRecent(name) {
+  recentFiles = recentFiles.filter(f => f !== name);
+  recentFiles.unshift(name);
+  if (recentFiles.length > 5) recentFiles.pop();
+}
+
+function showRecent() {
+  closeAll();
+  const list = document.getElementById('recent-list');
+  if (recentFiles.length === 0) {
+    list.innerHTML = '<div class="recent-empty">No recent files.</div>';
+  } else {
+    list.innerHTML = recentFiles.map(f =>
+      `<div class="recent-item" onclick="openRecent('${f}')">${f}</div>`
+    ).join('');
+  }
+  document.getElementById('recent-dialog').classList.add('show');
+}
+
+function openRecent(name) {
+  closeRecent();
+  // cant actually open by name without file picker
+  // so just set the filename and tell user
+  currentFile = name;
+  alert(`To open "${name}", use File > Open and select it.\n(Browser security prevents auto-opening local files)`);
+  updateStatus();
+}
+
+function closeRecent() { document.getElementById('recent-dialog').classList.remove('show'); }
+
+// ---- EDIT OPERATIONS ----
+function selectAll() { closeAll(); editor.select(); }
+
+// ---- FIND & REPLACE ----
+function showFind() {
+  closeAll();
+  document.getElementById('find-dialog').classList.add('show');
+  document.getElementById('find-input').focus();
+}
+
+function closeFind() {
+  document.getElementById('find-dialog').classList.remove('show');
+  document.getElementById('find-result').textContent = '';
+  findIndex = -1;
+}
+
+function doFind() {
+  const term = document.getElementById('find-input').value;
+  if (!term) return;
+  const text = editor.value;
+  const idx  = text.indexOf(term, findIndex + 1);
+  if (idx === -1) {
+    // wrap around
+    const first = text.indexOf(term);
+    if (first === -1) {
+      document.getElementById('find-result').textContent = 'Not found.';
+      document.getElementById('find-result').style.color = '#f38ba8';
+      findIndex = -1;
+      return;
+    }
+    findIndex = first;
+    document.getElementById('find-result').textContent = 'Wrapped to beginning.';
+    document.getElementById('find-result').style.color = '#f9e2af';
+  } else {
+    findIndex = idx;
+    document.getElementById('find-result').textContent = `Found at position ${idx}`;
+    document.getElementById('find-result').style.color = '#a6e3a1';
+  }
+  editor.setSelectionRange(findIndex, findIndex + term.length);
+  editor.focus();
+}
+
+function doReplace() {
+  const term    = document.getElementById('find-input').value;
+  const replace = document.getElementById('replace-input').value;
+  // dont allow replace if find box is empty
+  if (!term) { document.getElementById('find-result').textContent = 'Enter a word to find first.'; document.getElementById('find-result').style.color = '#f38ba8'; return; }
+  // warn if replace box is empty - dont want to accidentally delete words
+  if (replace === '' && term !== '') {
+    if (!confirm('Replace box is empty - this will DELETE the found word. Continue?')) return;
+  }
+  const start = editor.selectionStart;
+  const sel   = editor.value.substring(start, start + term.length);
+  if (sel === term) {
+    // replace current selection
+    const before = editor.value.substring(0, start);
+    const after  = editor.value.substring(start + term.length);
+    editor.value = before + replace + after;
+    isModified   = true;
+    updateLineNumbers();
+    updateStatus();
+    document.getElementById('find-result').textContent = 'Replaced 1 occurrence.';
+    document.getElementById('find-result').style.color = '#a6e3a1';
+  } else {
+    doFind(); // find first then user clicks again to replace
+  }
+}
+
+function doReplaceAll() {
+  const term    = document.getElementById('find-input').value;
+  const replace = document.getElementById('replace-input').value;
+  if (!term) { document.getElementById('find-result').textContent = 'Enter a word to find first.'; document.getElementById('find-result').style.color = '#f38ba8'; return; }
+  if (replace === '' && term !== '') {
+    if (!confirm('Replace box is empty - this will DELETE all occurrences of "' + term + '". Continue?')) return;
+  }
+  const original = editor.value;
+  const updated  = original.split(term).join(replace);
+  const count    = (original.match(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g')) || []).length;
+  if (count === 0) {
+    document.getElementById('find-result').textContent = 'Not found.';
+    document.getElementById('find-result').style.color = '#f38ba8';
+    return;
+  }
+  editor.value = updated;
+  isModified   = true;
+  findIndex    = -1;
+  updateLineNumbers();
+  updateStatus();
+  document.getElementById('find-result').textContent = `Replaced ${count} occurrence(s).`;
+  document.getElementById('find-result').style.color = '#a6e3a1';
+}
+
+// ---- FORMAT ----
+function showFormat() {
+  closeAll();
+  document.getElementById('format-dialog').classList.add('show');
+}
+
+function closeFormat() { document.getElementById('format-dialog').classList.remove('show'); }
+
+function setColor(color, el) {
+  editor.style.color = color;
+  lineNums.style.color = color;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function setBg(color, el) {
+  editor.style.background = color;
+  document.querySelectorAll('.color-swatch').forEach(s => {
+    // only deselect bg swatches
+    if (s.onclick && s.onclick.toString().includes('setBg'))
+      s.classList.remove('selected');
+  });
+  el.classList.add('selected');
+}
+
+function changeFont(font) {
+  editor.style.fontFamily = `'${font}', monospace`;
+}
+
+function changeSize(size) {
+  fontSize = parseInt(size);
+  editor.style.fontSize   = fontSize + 'px';
+  lineNums.style.fontSize = fontSize + 'px';
+}
+
+// ---- VIEW ----
+function toggleWrap() {
+  closeAll();
+  wordWrap = !wordWrap;
+  editor.style.whiteSpace = wordWrap ? 'pre-wrap' : 'pre';
+  document.getElementById('wrap-check').textContent    = wordWrap ? 'ON ✓' : 'OFF';
+  document.getElementById('wrap-btn').classList.toggle('active', wordWrap);
+  updateStatus();
+}
+
+function toggleLineNums() {
+  closeAll();
+  showLineNums = !showLineNums;
+  document.getElementById('linenum-check').textContent = showLineNums ? 'ON ✓' : 'OFF';
+  updateLineNumbers();
+}
+
+function toggleInsert() {
+  insertMode = !insertMode;
+  // ins-btn removed
+  // ins-btn removed
+  updateStatus();
+}
+
+function zoomIn()    { fontSize = Math.min(fontSize + 2, 32); editor.style.fontSize = fontSize + 'px'; lineNums.style.fontSize = fontSize + 'px'; }
+function zoomOut()   { fontSize = Math.max(fontSize - 2, 8);  editor.style.fontSize = fontSize + 'px'; lineNums.style.fontSize = fontSize + 'px'; }
+function zoomReset() { fontSize = 14; editor.style.fontSize = '14px'; lineNums.style.fontSize = '14px'; }
+
+// ---- MENU SYSTEM ----
+function toggleMenu(name) {
+  const menus = ['file','edit','format','view'];
+  menus.forEach(m => {
+    const el = document.getElementById('menu-' + m);
+    if (m === name) el.classList.toggle('active');
+    else el.classList.remove('active');
+  });
+  const anyOpen = menus.some(m => document.getElementById('menu-'+m).classList.contains('active'));
+  document.getElementById('overlay').classList.toggle('show', anyOpen);
+}
+
+function closeAll() {
+  ['file','edit','format','view'].forEach(m =>
+    document.getElementById('menu-' + m).classList.remove('active'));
+  document.getElementById('overlay').classList.remove('show');
+}
+
+// ---- KEYBOARD SHORTCUTS ----
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey) {
+    switch(e.key.toLowerCase()) {
+      case 'm': e.preventDefault(); newFile();    break;
+      case 'o': e.preventDefault(); openFile();   break;
+      case 's':
+        e.preventDefault();
+        if (e.shiftKey) saveAs(); else saveFile();
+        break;
+      case 'w': e.preventDefault(); closeFile();  break;
+      case 'f': e.preventDefault(); showFind();   break;
+      case 'a': e.preventDefault(); selectAll();  break;
+      case '=': case '+': e.preventDefault(); zoomIn();    break;
+      case '-': e.preventDefault(); zoomOut();   break;
+      case '0': e.preventDefault(); zoomReset(); break;
+    }
+  }
+  // Insert key removed - was confusing
+  if (e.key === 'Escape') { closeFind(); closeFormat(); closeRecent(); closeAll(); }
+});
+
+// ---- EDITOR EVENTS ----
+editor.addEventListener('input', () => {
+  isModified = true;
+  updateLineNumbers();
+  updateStatus();
+});
+
+editor.addEventListener('keyup', updateStatus);
+editor.addEventListener('click', updateStatus);
+editor.addEventListener('scroll', () => { lineNums.scrollTop = editor.scrollTop; });
+
+// keyboard handling inside editor
+editor.addEventListener('keydown', e => {
+  // tab inserts 4 spaces instead of moving focus out
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const start = editor.selectionStart;
+    const end   = editor.selectionEnd;
+    editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+    editor.selectionStart = editor.selectionEnd = start + 4;
+    isModified = true;
+    updateStatus();
+  }
+
+  // PgUp - manually scroll up one page
+  if (e.key === 'PageUp') {
+    e.preventDefault();
+    const lineH = parseInt(window.getComputedStyle(editor).lineHeight) || 22;
+    const pageH = editor.clientHeight;
+    editor.scrollTop -= pageH;
+    // move cursor up too
+    const lines = editor.value.substring(0, editor.selectionStart).split('');
+    const curRow = lines.length - 1;
+    const curCol = lines[curRow].length;
+    const linesPerPage = Math.floor(pageH / lineH);
+    const newRow = Math.max(0, curRow - linesPerPage);
+    const allLines = editor.value.split('');
+    let newPos = 0;
+    for (let i = 0; i < newRow; i++) newPos += allLines[i].length + 1;
+    newPos += Math.min(curCol, allLines[newRow].length);
+    editor.selectionStart = editor.selectionEnd = newPos;
+    updateStatus();
+  }
+
+  // PgDn - manually scroll down one page
+  if (e.key === 'PageDown') {
+    e.preventDefault();
+    const lineH = parseInt(window.getComputedStyle(editor).lineHeight) || 22;
+    const pageH = editor.clientHeight;
+    editor.scrollTop += pageH;
+    const lines = editor.value.substring(0, editor.selectionStart).split('');
+    const curRow = lines.length - 1;
+    const curCol = lines[curRow].length;
+    const linesPerPage = Math.floor(pageH / lineH);
+    const allLines = editor.value.split('');
+    const newRow = Math.min(allLines.length - 1, curRow + linesPerPage);
+    let newPos = 0;
+    for (let i = 0; i < newRow; i++) newPos += allLines[i].length + 1;
+    newPos += Math.min(curCol, allLines[newRow].length);
+    editor.selectionStart = editor.selectionEnd = newPos;
+    updateStatus();
+  }
+});
+
+// warn before closing tab if unsaved
+window.addEventListener('beforeunload', e => {
+  if (isModified) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// init
+updateLineNumbers();
+updateStatus();
+editor.focus();
+</script>
+</body>
+</html>
