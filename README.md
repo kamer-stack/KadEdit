@@ -12,6 +12,9 @@ A fully functional text editor built in C++ with a beautiful browser-based GUI. 
 
 
 ---
+Live demo: 
+ https://kamer-stack.github.io/KadEdit/
+---
 
 ## How to Compile
 
